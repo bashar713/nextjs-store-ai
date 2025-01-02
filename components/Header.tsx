@@ -11,7 +11,7 @@ export default function Header() {
   const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
 
-  const { totalItems } = useCart();
+  const { totalItems, clearCart } = useCart();
 
   useEffect(() => {
     // Get initial session and check admin status
@@ -50,6 +50,7 @@ export default function Header() {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
+      clearCart();
       setUser(null);
       setIsAdmin(false);
       window.location.href = '/';
