@@ -66,7 +66,7 @@ export default function Header() {
           <div className="flex items-center">
             <Link href="/">
               <span className="text-3xl font-extrabold tracking-tight text-gray-900 font-[Montserrat]">
-                STORE
+                BashBooks
               </span>
             </Link>
           </div>
@@ -75,6 +75,11 @@ export default function Header() {
             <Link href="/" className="text-gray-600 hover:text-gray-900">
               Home
             </Link>
+            {user && (
+              <Link href="/orders" className="text-gray-600 hover:text-gray-900">
+                Orders
+              </Link>
+            )}
             <Link href="#" className="text-gray-600 hover:text-gray-900">
               Shop
             </Link>

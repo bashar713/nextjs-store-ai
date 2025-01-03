@@ -1,42 +1,51 @@
 import Image from 'next/image';
-import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { Product } from '@/types';
+import { motion } from 'framer-motion';
+import { ShoppingCart, Heart } from 'lucide-react';
 
-interface ProductCardProps {
-  product: Product;
-}
-
-export default function ProductCard({ product }: ProductCardProps) {
+export default function ProductCard({ product }: { product: Product }) {
   const { addToCart } = useCart();
 
   return (
-    <div className="group relative">
-      <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300"
+    >
+      <div className="relative aspect-square overflow-hidden">
         <Image
-          src={product.image_url}
+          src={product.image_url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30"}
           alt={product.name}
-          width={500}
-          height={500}
-          className="h-full w-full object-cover object-center group-hover:opacity-75"
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-300"
         />
-      </div>
-      <div className="mt-4 space-y-2">
-        <div>
-          <h3 className="text-sm font-medium text-gray-900">
-            {product.name}
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">{product.description}</p>
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
+        <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <button className="p-2 bg-white rounded-full shadow-md hover:bg-primary hover:text-white transition-colors">
+            <Heart className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={() => addToCart(product)}
+            className="p-2 bg-white rounded-full shadow-md hover:bg-primary hover:text-white transition-colors"
+          >
+            <ShoppingCart className="w-5 h-5" />
+          </button>
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-lg font-medium text-gray-900">${product.price}</p>
+      </div>
+      <div className="p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-1">{product.name}</h3>
+        <p className="text-sm text-gray-500 mb-2 line-clamp-2">{product.description}</p>
+        <div className="flex justify-between items-center">
+          <span className="text-xl font-bold text-primary">${product.price.toFixed(2)}</span>
           <button
             onClick={() => addToCart(product)}
-            className="bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors"
+            className="px-4 py-2 bg-primary text-white rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             Add to Cart
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 } 
