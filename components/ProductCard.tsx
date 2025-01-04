@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, Heart } from 'lucide-react';
 
 export default function ProductCard({ product }: { product: Product }) {
-  const { addToCart } = useCart();
+  const { addToCart, loadingProductIds } = useCart();
+  const isLoading = loadingProductIds.includes(product.id);
 
   return (
     <motion.div 
@@ -22,14 +23,10 @@ export default function ProductCard({ product }: { product: Product }) {
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
         <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <button className="p-2 bg-white rounded-full shadow-md hover:bg-primary hover:text-white transition-colors">
-            <Heart className="w-5 h-5" />
-          </button>
           <button 
-            onClick={() => addToCart(product)}
             className="p-2 bg-white rounded-full shadow-md hover:bg-primary hover:text-white transition-colors"
           >
-            <ShoppingCart className="w-5 h-5" />
+            <Heart className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -40,9 +37,12 @@ export default function ProductCard({ product }: { product: Product }) {
           <span className="text-xl font-bold text-primary">${product.price.toFixed(2)}</span>
           <button
             onClick={() => addToCart(product)}
-            className="px-4 py-2 bg-primary text-white rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
+            disabled={isLoading}
+            className={`px-4 py-2 bg-primary text-white rounded-full text-sm font-medium 
+              ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'} 
+              transition-colors`}
           >
-            Add to Cart
+            {isLoading ? 'Adding...' : 'Add to Cart'}
           </button>
         </div>
       </div>

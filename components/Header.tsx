@@ -50,10 +50,10 @@ export default function Header() {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      clearCart();
+      await clearCart();
       setUser(null);
       setIsAdmin(false);
-      window.location.href = '/';
+      router.push('/');
     } catch (error) {
       console.error('Error signing out:', error);
     }

@@ -13,20 +13,30 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Add products to localStorage cache
+    const cachedProducts = localStorage.getItem('products');
+    if (cachedProducts) {
+      setProducts(JSON.parse(cachedProducts));
+      setIsLoading(false);
+    }
+
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
     try {
-      setIsLoading(true);
       const { data: products, error } = await supabase
         .from('products')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(8);
+//        .limit(8)
+//        .range(0, 7); // Fetch first 8 products
 
       if (error) throw error;
+
       setProducts(products || []);
+      // Cache the products
+      localStorage.setItem('products', JSON.stringify(products));
     } catch (error) {
       console.error('Error fetching products:', error);
       setError('Failed to load products');

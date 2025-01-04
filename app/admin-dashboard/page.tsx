@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AddProductForm from '@/components/admin/AddProductForm';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import EditProductForm from '@/components/admin/EditProductForm';
 
 interface User {
   id: string;
@@ -13,6 +16,15 @@ interface User {
   updated_at: string;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +32,13 @@ export default function AdminDashboard() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [showDeleteProductModal, setShowDeleteProductModal] = useState(false);
+  const [deleteProductLoading, setDeleteProductLoading] = useState(false);
+  const [showEditProductModal, setShowEditProductModal] = useState(false);
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -102,8 +121,78 @@ export default function AdminDashboard() {
     setUserToDelete(null);
   };
 
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    setProductToDelete(product);
+    setShowDeleteProductModal(true);
+  };
+
+  const handleDeleteProductConfirm = async () => {
+    if (!productToDelete) return;
+    setDeleteProductLoading(true);
+
+    try {
+      // Delete product image from storage if it exists
+      if (productToDelete.image_url) {
+        const fileName = productToDelete.image_url.split('/').pop();
+        if (fileName) {
+          await supabase.storage
+            .from('product-images')
+            .remove([fileName]);
+        }
+      }
+
+      // Delete product from database
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productToDelete.id);
+
+      if (error) throw error;
+
+      setProducts(products.filter(p => p.id !== productToDelete.id));
+      setShowDeleteProductModal(false);
+      setProductToDelete(null);
+      setError('Product successfully deleted');
+      setTimeout(() => setError(null), 3000);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      setError('Failed to delete product');
+    } finally {
+      setDeleteProductLoading(false);
+    }
+  };
+
+  const handleEditSuccess = () => {
+    setShowEditProductModal(false);
+    setError('Product updated successfully!');
+    setTimeout(() => setError(null), 3000);
+    fetchProducts(); // Refresh products list
+  };
+
+  const handleAddSuccess = () => {
+    setShowAddProductModal(false);
+    setError('Product added successfully!');
+    setTimeout(() => setError(null), 3000);
+    fetchProducts(); // Refresh the products list
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchProducts();
   }, []);
 
   if (loading) {
@@ -203,6 +292,78 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Products Table */}
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mt-8">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-bold text-gray-900">Products</h2>
+            <button
+              onClick={() => setShowAddProductModal(true)}
+              className="flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Add Product
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Image</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {products.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden">
+                        <img
+                          src={product.image_url || "https://via.placeholder.com/150"}
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-500 line-clamp-2">{product.description}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">${product.price.toFixed(2)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => {
+                            setProductToEdit(product);
+                            setShowEditProductModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Pencil className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(product)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -253,6 +414,88 @@ export default function AdminDashboard() {
                 ) : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Product Modal */}
+      {showDeleteProductModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md mx-auto p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Delete Product</h3>
+            <p className="text-gray-500 mb-4">
+              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteProductModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                disabled={deleteProductLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteProductConfirm}
+                className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 flex items-center"
+                disabled={deleteProductLoading}
+              >
+                {deleteProductLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product Modal */}
+      {showAddProductModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-auto p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Add New Product</h3>
+              <button
+                onClick={() => setShowAddProductModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <AddProductForm 
+              onSuccess={handleAddSuccess}
+              onCancel={() => setShowAddProductModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {showEditProductModal && productToEdit && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-auto p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Edit Product</h3>
+              <button
+                onClick={() => {
+                  setShowEditProductModal(false);
+                  setProductToEdit(null);
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <EditProductForm 
+              product={productToEdit}
+              onSuccess={handleEditSuccess}
+              onCancel={() => {
+                setShowEditProductModal(false);
+                setProductToEdit(null);
+              }}
+            />
           </div>
         </div>
       )}
