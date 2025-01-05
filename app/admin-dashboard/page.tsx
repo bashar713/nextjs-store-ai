@@ -6,6 +6,7 @@ import Link from 'next/link';
 import AddProductForm from '@/components/admin/AddProductForm';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import EditProductForm from '@/components/admin/EditProductForm';
+import { toast } from 'react-hot-toast';
 
 interface User {
   id: string;
@@ -23,6 +24,32 @@ interface Product {
   price: number;
   image_url: string;
   created_at: string;
+  stock_quantity: number;
+}
+
+interface OrderWithDetails {
+  id: string;
+  created_at: string;
+  status: string;
+  payment_method: string;
+  total: number;
+  total_amount: number;
+  shipping_address: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  managed_users: {
+    email: string;
+  };
+  order_items: {
+    quantity: number;
+    price_at_time: number;
+    product: {
+      name: string;
+    };
+  }[];
 }
 
 export default function AdminDashboard() {
@@ -39,6 +66,10 @@ export default function AdminDashboard() {
   const [showDeleteProductModal, setShowDeleteProductModal] = useState(false);
   const [deleteProductLoading, setDeleteProductLoading] = useState(false);
   const [showEditProductModal, setShowEditProductModal] = useState(false);
+  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -190,9 +221,144 @@ export default function AdminDashboard() {
     fetchProducts(); // Refresh the products list
   };
 
+  const fetchOrders = async () => {
+    try {
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          managed_users!id (
+            email
+          ),
+          order_items (
+            quantity,
+            price_at_time,
+            product:product_id (
+              name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(orders || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      // Get current user session first
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        throw new Error('Authentication required');
+      }
+
+      // Check if user has admin role using their ID
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) {
+        throw new Error('Failed to verify admin status');
+      }
+
+      if (profile?.role !== 'admin') {
+        throw new Error('Unauthorized: Only admins can update order status');
+      }
+
+      // Update the order status in the database
+      const { data, error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select('*')
+        .single();
+
+      if (updateError) {
+        console.error('Supabase update error:', updateError);
+        throw new Error(updateError.message);
+      }
+
+      if (!data) {
+        throw new Error('Failed to update order status');
+      }
+
+      // Update local state immediately for better UX
+      setOrders(currentOrders =>
+        currentOrders.map(order =>
+          order.id === orderId
+            ? { ...order, ...data }
+            : order
+        )
+      );
+      
+      toast.success('Order status updated successfully');
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to update order status';
+      console.error('Error updating order:', errorMessage);
+      toast.error(errorMessage);
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-50 text-yellow-800 border-yellow-200';
+      case 'processing':
+        return 'bg-blue-50 text-blue-800 border-blue-200';
+      case 'completed':
+        return 'bg-green-50 text-green-800 border-green-200';
+      case 'cancelled':
+        return 'bg-red-50 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-800 border-gray-200';
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchProducts();
+    fetchOrders();
+  }, []);
+
+  useEffect(() => {
+    // Set up real-time subscription for order status updates
+    const channel = supabase
+      .channel('order-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          // Update the orders list when a change occurs
+          setOrders(currentOrders =>
+            currentOrders.map(order =>
+              order.id === payload.new.id
+                ? { ...order, status: payload.new.status }
+                : order
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription when component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {
@@ -364,6 +530,62 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mt-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900">Customer Orders</h2>
+          </div>
+
+          {loadingOrders ? (
+            <div className="text-center py-4">Loading orders...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Order ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {order.id.slice(0, 8)}...
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.managed_users?.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <select
+                          value={order.status}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          className={`text-sm rounded-full px-3 py-1 border transition-colors duration-200 ${getStatusStyle(order.status)}`}
+                        >
+                          <option value="pending" className="bg-white text-gray-800">Pending</option>
+                          <option value="processing" className="bg-white text-gray-800">Processing</option>
+                          <option value="completed" className="bg-white text-gray-800">Completed</option>
+                          <option value="cancelled" className="bg-white text-gray-800">Cancelled</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ${order.total_amount ? Number(order.total_amount).toFixed(2) : '0.00'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -496,6 +718,69 @@ export default function AdminDashboard() {
                 setProductToEdit(null);
               }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Order Details Modal */}
+      {showOrderModal && selectedOrder && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-8 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
+              <button
+                onClick={() => {
+                  setShowOrderModal(false);
+                  setSelectedOrder(null);
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Customer Information</h4>
+                <p className="text-sm text-gray-600">
+                  {selectedOrder.managed_users?.email}
+                </p>
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Shipping Address</h4>
+                <p className="text-sm text-gray-600">
+                  {selectedOrder.shipping_address.street}<br />
+                  {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state}<br />
+                  {selectedOrder.shipping_address.zip}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <h4 className="font-medium text-gray-900 mb-4">Order Items</h4>
+              <div className="space-y-3">
+                {selectedOrder.order_items.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{item.product.name}</p>
+                      <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">
+                      ${(item.price_at_time * item.quantity).toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 mt-6 pt-4">
+              <div className="flex justify-between items-center">
+                <p className="text-base font-medium text-gray-900">Total</p>
+                <p className="text-lg font-bold text-gray-900">${selectedOrder.total.toFixed(2)}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Inter, Playfair_Display } from 'next/font/google'
 import { Montserrat } from 'next/font/google'
 import { CartProvider } from '@/context/CartContext';
+import { Toaster } from 'react-hot-toast';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +42,7 @@ export default function RootLayout({
       >
         <CartProvider>
           {children}
+          <Toaster position="top-center" />
         </CartProvider>
       </body>
     </html>

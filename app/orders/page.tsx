@@ -9,6 +9,13 @@ interface Order {
   created_at: string;
   total: number;
   status: string;
+  payment_method: string;
+  shipping_address: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
   order_items: {
     quantity: number;
     product: {
@@ -122,6 +129,24 @@ export default function OrdersPage() {
                     }`}>
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                     </span>
+                  </div>
+                </div>
+
+                <div className="px-6 py-4 bg-gray-50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">Shipping Address</h3>
+                      <p className="text-sm text-gray-600">
+                        {order.shipping_address.street}<br />
+                        {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zip}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">Payment Method</h3>
+                      <p className="text-sm text-gray-600 capitalize">
+                        {order.payment_method === 'cash' ? 'Cash on Delivery' : 'Credit Card'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

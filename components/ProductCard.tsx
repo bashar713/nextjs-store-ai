@@ -4,8 +4,13 @@ import { Product } from '@/types';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Heart } from 'lucide-react';
 
-export default function ProductCard({ product }: { product: Product }) {
-  const { addToCart, loadingProductIds } = useCart();
+interface ProductCardProps {
+  product: Product;
+  onAddToCart: () => void;
+}
+
+export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
+  const { loadingProductIds } = useCart();
   const isLoading = loadingProductIds.includes(product.id);
 
   return (
@@ -36,7 +41,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="flex justify-between items-center">
           <span className="text-xl font-bold text-primary">${product.price.toFixed(2)}</span>
           <button
-            onClick={() => addToCart(product)}
+            onClick={onAddToCart}
             disabled={isLoading}
             className={`px-4 py-2 bg-primary text-white rounded-full text-sm font-medium 
               ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'} 

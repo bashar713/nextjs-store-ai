@@ -83,9 +83,11 @@ export default function Header() {
             <Link href="#" className="text-gray-600 hover:text-gray-900">
               Shop
             </Link>
-            <Link href="#" className="text-gray-600 hover:text-gray-900">
-              About
-            </Link>
+            {user ? (
+              <Link href="/account" className="text-gray-600 hover:text-gray-900">
+                My Account
+              </Link>
+            ) : null}
             <Link href="#" className="text-gray-600 hover:text-gray-900">
               Contact
             </Link>

@@ -6,11 +6,13 @@ import { Product } from '@/types';
 import Header from '@/components/Header';
 import { motion } from 'framer-motion';
 import { TrendingUp, Award, Clock, Truck } from 'lucide-react';
+import { useCart } from '@/context/CartContext';
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     // Add products to localStorage cache
@@ -42,6 +44,14 @@ export default function Home() {
       setError('Failed to load products');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddToCart = async (product: Product) => {
+    try {
+      await addToCart(product);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
     }
   };
 
@@ -118,7 +128,11 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard 
+                    key={product.id} 
+                    product={product}
+                    onAddToCart={() => handleAddToCart(product)}
+                  />
                 ))}
               </div>
             )}
